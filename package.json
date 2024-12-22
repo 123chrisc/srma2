@@ -10,6 +10,17 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@anthropic-ai/sdk": "^0.33.1",
+    "@elysiajs/swagger": "^1.1.6",
+    "dotenv": "^16.4.7",
+    "elysia": "^1.1.26",
+    "express": "^4.21.2",
+    "openai": "^4.77.0"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --target bun --outdir ./dist",
+    "start": "NODE_ENV=production bun dist/index.js",
+    "test": "bun test"
   }
 }
