@@ -1,15 +1,17 @@
-# srma2
+1. Instantiate a .venv virtual environment
 
-To install dependencies:
-
-```bash
-bun install
+2. 
+```shell
+pip install -r requirements.txt
 ```
 
-To run:
+3. fastapi dev src/main.py
 
-```bash
-bun run index.ts
-```
+4. Head to http://localhost:8000/docs to make the requests
 
-This project was created using `bun init` in bun v1.1.42. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+
+
+To see the ids of the batches/ensembles. Use 
+1. `sqlite3 srma.db` 
+2. `.tables`
+3. `select * from batch_ids;`
