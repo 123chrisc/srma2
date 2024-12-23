@@ -1,4 +1,6 @@
-# Setup
+# SRMA 2
+
+## Setup
 
 REMEMBER TO UPDATE THE .env file
 
@@ -25,7 +27,7 @@ fastapi dev src/main.py
 5. Head to http://localhost:8000/docs to make the requests and see the responses
 
 
-
+## Debugging
 To see the ids of the batches/ensembles. Use 
 
 1. 
