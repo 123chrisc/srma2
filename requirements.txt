@@ -18,7 +18,7 @@ jiter==0.8.2
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
-numpy==2.2.1
+numpy==2.0.1
 openai==1.58.1
 pydantic==2.10.4
 pydantic_core==2.27.2

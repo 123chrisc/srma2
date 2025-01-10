@@ -1,13 +1,15 @@
-from typing import Dict
-
+from typing import Dict, Any
+from src.extraction.variable_handler import ExtractionHandler
 
 class Result:
-    def __init__(self, response: str, answers: Dict[str, str]):
+    def __init__(self, response: str, article_id: str):
         self.response = response
-        self.answers = answers
-        self.result = self.verify_result(response)
+        self.article_id = article_id
+        self.extractions = {}
 
-    def verify_result(self, response: str):
-        # ALTER TO VERIFY WHETHER THE RESULT IS CORRECT
-        # compare response to the answers
-        return True
+    def extract(self, extraction_handler: ExtractionHandler) -> Dict[str, Any]:
+        """
+        Parse the variables when explicitly called
+        """
+        self.extractions = extraction_handler.extract_and_validate(self.response)
+        return self.extractions

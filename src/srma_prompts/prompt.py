@@ -1,4 +1,4 @@
-FINAL_PROMPT = "{preprompt}\n# Abstract in investigation: \n{abstract}\n\n{prompt}\n"
+FINAL_PROMPT = "{preprompt}\n# Full-text article to analyze: \n{content}\n\n{prompt}\n"
 
 
 class Prompt:
@@ -7,18 +7,15 @@ class Prompt:
         abstract_id: str,
         preprompt: str,
         prompt: str,
-        abstract: str,
+        content: str,
     ):
         self.abstract_id = abstract_id
         self.__prompt = prompt
         self.__preprompt = preprompt
 
-        few_shot_text = ""
-
-        few_shot_text += "\n# Start of Examples\n"
         # Create the prompt and get the response
         self.final_prompt = FINAL_PROMPT.format(
-            preprompt=preprompt, prompt=prompt, abstract=abstract
+            preprompt=preprompt, prompt=prompt, content=content
         )
 
     def get_prompt(self):
