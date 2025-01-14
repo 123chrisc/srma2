@@ -6,6 +6,7 @@ from src.generate.task import GenerationTask
 from src.generate.retrieve import RetrievalTask
 from src.api.data_extraction import DataExtractionRequest
 from src.db.database import Database
+from src.interfaces.factory import get_interface
 
 load_dotenv()
 
@@ -123,4 +124,29 @@ async def evaluate(ensemble_id: str):
         "status": "complete",
         "accuracy_report": metrics,
         "comparisons": comparisons
+    }
+
+
+@app.get("/batch_status/{ensemble_id}")
+async def batch_status(ensemble_id: str):
+    """
+    Provide the status of each batch associated with a particular ensemble ID.
+    This endpoint queries the model provider to retrieve the actual batch status.
+    """
+    db = Database()
+    batch_info = db.retrieve_batch_info(ensemble_id)
+    if not batch_info:
+        return {"error": f"Ensemble ID '{ensemble_id}' not found in batch_info."}
+
+    model = batch_info["model"]
+    interface = get_interface(model)
+    batch_ids = batch_info["batch_ids"]
+
+    # Retrieve the batch objects and collect their statuses
+    batches = await interface.retrieve_batches(batch_ids)
+    statuses = {b.id: b.status for b in batches}
+
+    return {
+        "ensemble_id": ensemble_id,
+        "batch_statuses": statuses
     }
