@@ -64,8 +64,16 @@ class AnthropicInterface(Interface):
         return [self.to_batch(batch) for batch in batches]
 
     def to_result(self, result: BetaMessageBatchIndividualResponse):
+        # If "message" doesn’t exist, return some error placeholder
+        if not hasattr(result.result, "message"):
+            return BatchResponseInterface(
+                id=str(result.custom_id),
+                response="(errored result - no message)"
+            )
+
         return BatchResponseInterface(
-            id=result.custom_id, response=result.result.message.content[0].text  # type: ignore
+            id=result.custom_id,
+            response=result.result.message.content[0].text  # type: ignore
         )
 
     async def download_batches(self, batches: List[BatchInterface]):

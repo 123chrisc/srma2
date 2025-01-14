@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional, List, Callable
 import re
 import pandas as pd
 from src.api.data_extraction import VariableDefinition
+import itertools
 
 class ValidationError(Exception):
     pass
@@ -117,39 +118,55 @@ Please extract these variables and format your response as follows:
 
     def extract_and_validate(self, llm_response: str) -> Dict[str, Any]:
         """
-        Extract and perform basic validation on LLM response
+        Extract and perform basic validation on LLM response,
+        handling multiple comma-separated values per variable.
         """
+
         # Extract data between markers
         pattern = r"\[START_EXTRACTIONS\](.*?)\[END_EXTRACTIONS\]"
         match = re.search(pattern, llm_response, re.DOTALL)
         if not match:
             raise ValidationError("No extraction block found in response")
-            
+
         extraction_text = match.group(1).strip()
-        
-        # Parse extractions into dictionary
         extractions = {}
+
+        # Parse each line for "key: value" pairs
         for line in extraction_text.split("\n"):
-            if ":" not in line:
+            line_stripped = line.strip()
+            if ":" not in line_stripped:
                 continue
-            key, value = line.split(":", 1)
+
+            key, value = line_stripped.split(":", 1)
             key = key.strip()
             value = value.strip()
-            
-            # NEW: remove leading "<digits>. " if present
+
+            # Remove leading "<digits>. " if present
             key = re.sub(r'^\d+\.\s*', '', key)
-            
+
+            # Process only recognized variables
             if key in self.validators:
-                try:
-                    extractions[key] = self.validators[key](value)
-                except Exception as e:
-                    raise ValidationError(f"Validation failed for {key}: {str(e)}")
-        
+                # Split on commas for multiple entries
+                raw_values = [v.strip() for v in value.split(",") if v.strip()]
+                parsed_values = []
+                for val_part in raw_values:
+                    try:
+                        validated_val = self.validators[key](val_part)
+                        parsed_values.append(validated_val)
+                    except Exception as e:
+                        raise ValidationError(f"Validation failed for {key}: {str(e)}")
+
+                # Store single value or list
+                if len(parsed_values) == 1:
+                    extractions[key] = parsed_values[0]
+                else:
+                    extractions[key] = parsed_values
+
         # Check for required fields
         for var_name, var_def in self.variables.items():
             if var_def.required and var_name not in extractions:
                 raise ValidationError(f"Required field {var_name} missing from extraction")
-                
+
         return extractions
     
     # Optional: Evaluate logic to compare to ground-truth CSV columns
@@ -172,23 +189,18 @@ Please extract these variables and format your response as follows:
             "fully_correct_rows": 0
         }
 
-        # We’ll store details for each matched item here:
         comparisons_list = []
 
         for _, row in df.iterrows():
             article_id = row[id_column]
             var_extractions = db.retrieve_variable_extractions(ensemble_id, article_id)
             if not var_extractions:
-                # Skip if no extractions
-                continue
+                continue  # Skip if no extractions
 
             metrics["total_articles"] += 1
-
-            # Keep track of whether this entire row was fully correct
             row_fully_correct = True
 
-            # Gather all variables for which we have a CSV column and an extracted value
-            # e.g. { var_name: {"extracted": [...], "ground": [...], "data_type": ..., "rules": ...} }
+            # Build dict of variable -> { "extracted": [...], "ground": [...], "data_type": ..., "rules": ... }
             row_vars = {}
             for var_name, var_def in self.variables.items():
                 if var_name in var_extractions and var_def.csv_column and var_def.csv_column in row:
@@ -201,24 +213,48 @@ Please extract these variables and format your response as follows:
                         "rules": var_def.validation_rules or {}
                     }
 
-            # Skip if no overlapping variables in this row
             if not row_vars:
                 continue
 
-            # Instead of skipping rows at any mismatch, do partial matching
+            # Compare variable by variable
             for var_name, info in row_vars.items():
                 ex_list = info["extracted"]
                 gt_list = info["ground"]
                 data_type = info["data_type"]
                 rules = info["rules"]
 
-                # Compare up to the smaller length
+                # If you want to compare ignoring broad order:
+                # Attempt all permutations of ground truth (or extracted).
+                # For each permutation, count matches. Pick the best one.
+                # NOTE: For large lists, a more efficient approach is advised.
+
+                best_permutation_matches = []
+                best_match_count = -1
+
+                # We'll track the smallest length to handle "leftover" items later
                 min_len = min(len(ex_list), len(gt_list))
-                for i in range(min_len):
+
+                for perm in itertools.permutations(gt_list):
+                    # Compare ex_list[i] to perm[i]
+                    match_list = []
+                    match_count = 0
+                    for i in range(min_len):
+                        ex_val = ex_list[i]
+                        perm_val = perm[i]
+                        matched = self._compare_single_val(ex_val, perm_val, data_type, rules)
+                        if matched:
+                            match_count += 1
+                        match_list.append((ex_val, perm_val, matched))
+
+                    # Keep track if this permutation is the best so far
+                    if match_count > best_match_count:
+                        best_match_count = match_count
+                        best_permutation_matches = match_list
+
+                # best_permutation_matches now holds the item-by-item best pairing
+                # Mark each comparison in comparisons_list
+                for ex_val, best_gt_val, matched in best_permutation_matches:
                     metrics["total_variables"] += 1
-                    ex_val = ex_list[i]
-                    gt_val = gt_list[i]
-                    matched = self._compare_single_val(ex_val, gt_val, data_type, rules)
                     if matched:
                         metrics["correct"] += 1
                     else:
@@ -229,11 +265,11 @@ Please extract these variables and format your response as follows:
                         "article_id": article_id,
                         "variable_name": var_name,
                         "extracted_value": ex_val,
-                        "ground_value": gt_val,
+                        "ground_value": best_gt_val,
                         "matched": matched
                     })
 
-                # Handle leftover extracted items
+                # Handle leftover extracted items beyond the min_len
                 if len(ex_list) > min_len:
                     leftover = ex_list[min_len:]
                     for ex_val in leftover:
@@ -248,7 +284,7 @@ Please extract these variables and format your response as follows:
                             "matched": False
                         })
 
-                # Handle leftover ground items
+                # Handle leftover ground items beyond the min_len
                 if len(gt_list) > min_len:
                     leftover = gt_list[min_len:]
                     for gt_val in leftover:
@@ -266,7 +302,6 @@ Please extract these variables and format your response as follows:
             if row_fully_correct:
                 metrics["fully_correct_rows"] += 1
 
-        # Return both metrics and comparisons
         return {
             "metrics": metrics,
             "comparisons": comparisons_list

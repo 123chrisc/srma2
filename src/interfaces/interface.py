@@ -2,10 +2,13 @@ from typing import List
 
 from pydantic import BaseModel
 
-MAX_COMPLETION_TOKENS = 4096
+MAX_COMPLETION_TOKENS = 8192
+# 16384 is the max for GPT-4o
+# 8192 is the max for Claude 3.5 Sonnet
 
 OPENAI_MODELS = set(
     [
+        "o1-2024-12-17",
         "gpt-4-0125-preview",
         "gpt-4-turbo-2024-04-09",
         "gpt-4o-2024-05-13",

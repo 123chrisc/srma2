@@ -115,11 +115,20 @@ class Database:
         self.conn.commit()
 
     def store_multiple_variable_extractions(self, ensemble_id: str, article_id: str, extractions: Dict[str, Any]):
-        # Stores each variable separately
+        """
+        Stores each variable separately for list values.
+        E.g., "5313, 4433"
+        """
         for var_name, value in extractions.items():
+            if isinstance(value, list):
+                # Join list items by comma
+                value_str = ", ".join(str(v) for v in value)
+            else:
+                value_str = str(value)
+
             self.cursor.execute(
                 "INSERT OR REPLACE INTO extracted_variables VALUES (?, ?, ?, ?)",
-                (ensemble_id, article_id, var_name, str(value))
+                (ensemble_id, article_id, var_name, value_str)
             )
         self.conn.commit()
 

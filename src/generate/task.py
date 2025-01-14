@@ -1,4 +1,5 @@
-from typing import List
+import asyncio
+from typing import List, Dict
 import uuid
 from src.api.data_extraction import DataExtractionRequest
 from src.db.database import Database
@@ -8,7 +9,6 @@ from src.srma_prompts.prompt import Prompt
 import pandas as pd
 
 class GenerationTask:
-
     model: Interface
 
     def __init__(self):
@@ -23,19 +23,40 @@ class GenerationTask:
 
         # Generate prompts
         prompts = self.generate_prompts(content, article_ids)
-        batch_ids = await self.generate_batches(prompts)
+        
+        # Generate batches concurrently
+        batch_tasks = [
+            self.generate_batch(prompts, self.ensemble_id)
+            for _ in range(self.ensemble)
+        ]
+        
+        # Wait for all batches to complete or fail
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Filter out failures and collect valid batch_ids
+        batch_ids = []
+        for result in batch_results:
+            if isinstance(result, Exception):
+                print(f"Batch generation failed: {str(result)}")
+            else:
+                batch_ids.append(result)
 
-        # Store everything in the DB
+        if not batch_ids:
+            raise ValueError("No valid batch IDs were generated")
+
+        # Store everything in the DB with status
         self.db.store_batch_info(
             ensemble_id=self.ensemble_id,
             batch_ids=batch_ids,
             model=self.model.model,
             variables=request.variables,
-            doc_ids=article_ids,            # store CSV article IDs
+            doc_ids=article_ids,
             dataset_path=request.dataset_path,
             preprompt=request.preprompt,
             prompt=request.prompt
         )
+        
+        print(f"Successfully generated {len(batch_ids)} batches")
         print(f"Batch ids: {batch_ids}, ensemble id: {self.ensemble_id}")
         return self.ensemble_id
 
@@ -67,15 +88,27 @@ class GenerationTask:
         return prompts
 
     async def generate_batch(self, prompts: List[Prompt], ensemble_id: str):
-        return await self.model.create_batch(
-            prompts=[prompt.get_prompt() for prompt in prompts],
-            prompts_ids=[prompt.abstract_id for prompt in prompts],
-            ensemble_id=ensemble_id,
-            seed=self.seed,
-        )
-
-    async def generate_batches(self, prompts: List[Prompt]):
-        return [
-            await self.generate_batch(prompts, self.ensemble_id)
-            for _ in range(self.ensemble)
-        ]
+        """Generate a single batch with validation and retries"""
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                batch_id = await self.model.create_batch(
+                    prompts=[prompt.get_prompt() for prompt in prompts],
+                    prompts_ids=[prompt.abstract_id for prompt in prompts],
+                    ensemble_id=ensemble_id,
+                    seed=self.seed,
+                )
+                
+                # Validate file_id
+                if not batch_id or not isinstance(batch_id, str) or len(batch_id.strip()) == 0:
+                    raise ValueError(f"Invalid batch_id received from OpenAI: {batch_id}")
+                
+                return batch_id
+                
+            except Exception as e:
+                if attempt == max_retries - 1:  # Last attempt
+                    raise  # Re-raise the last exception
+                print(f"Batch creation attempt {attempt + 1} failed: {str(e)}")
+                await asyncio.sleep(retry_delay * (attempt + 1))  # Exponential backoff
