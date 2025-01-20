@@ -51,7 +51,7 @@ class Interface:
             raise ValueError(f"Model {self.model} is not available")
 
     async def create_batch(
-        self, prompts: List[str], prompts_ids: List[str], ensemble_id: str, seed: int
+        self, prompts: List[str], prompts_ids: List[str], prompt_run_id: str, seed: int
     ) -> str:
         raise NotImplementedError("create_batch is not implemented for this model")
 

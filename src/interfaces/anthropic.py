@@ -25,7 +25,7 @@ class AnthropicInterface(Interface):
 
     # prompt_ids should be a list of ints mapped to the prompts
     async def create_batch(
-        self, prompts: List[str], prompts_ids: List[str], ensemble_id: str, seed: int
+        self, prompts: List[str], prompts_ids: List[str], prompt_run_id: str, seed: int
     ):
         requests: List[Request] = []
         for i, prompt in enumerate(prompts):

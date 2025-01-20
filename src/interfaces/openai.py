@@ -25,7 +25,7 @@ class OpenAIInterface(Interface):
 
     # prompt_ids should be a list of ints mapped to the prompts
     async def create_batch(
-        self, prompts: List[str], prompts_ids: List[str], ensemble_id: str, seed: int
+        self, prompts: List[str], prompts_ids: List[str], prompt_run_id: str, seed: int
     ):
         lines: List[Dict[str, Any]] = []
         for i, prompt in enumerate(prompts):
@@ -57,7 +57,7 @@ class OpenAIInterface(Interface):
                 input_file_id=input_file_id,
                 endpoint="/v1/chat/completions",
                 completion_window="24h",
-                metadata={"ensemble_id": str(ensemble_id)},
+                metadata={"prompt_run_id": str(prompt_run_id)},
             )
             print("Batch created", batch.id)
             return batch.id
