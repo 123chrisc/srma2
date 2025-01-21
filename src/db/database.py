@@ -2,6 +2,9 @@ import sqlite3
 from typing import List, Dict, Any, Optional
 import json
 from src.api.data_extraction import VariableDefinition
+from pymongo import MongoClient
+from pymongo.collection import Collection
+from pymongo.database import Database
 
 class Database:
     def __init__(self, path="data_extraction3.db"):
@@ -336,3 +339,45 @@ class Database:
         if not row:
             return None
         return json.loads(row["variables_json"])
+
+class MongoDB:
+    def __init__(self, username: str = "rohitarora", password: str = "j5TtHkxALikvZKH4"):
+        connection_string = f"mongodb+srv://{username}:{password}@srmaclus.ycrvf.mongodb.net/?retryWrites=true&w=majority"
+        self.client = MongoClient(connection_string)
+        self.db: Database = self.client.get_database("SRMAclus")
+        self.batches: Collection = self.db.get_collection("run_batched")
+        self.individual_status: Collection = self.db.get_collection("individual_batch_status")
+    
+    def save_batch(self, batch_data: Dict[str, Any]) -> None:
+        """Save or update a batch document"""
+        self.batches.update_one(
+            {"ensemble_id": batch_data["ensemble_id"]},
+            {"$set": batch_data},
+            upsert=True
+        )
+    
+    def get_batch(self, batch_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a batch document"""
+        return self.batches.find_one({"ensemble_id": batch_id})
+    
+    def update_batch_status(self, batch_id: str, status: str, **kwargs) -> None:
+        """Update batch status and additional fields"""
+        update_data = {"status": status, **kwargs}
+        self.batches.update_one(
+            {"ensemble_id": batch_id},
+            {"$set": update_data}
+        )
+    
+    def get_incomplete_batches(self) -> List[Dict[str, Any]]:
+        """Get all batches that haven't completed processing"""
+        return list(self.batches.find(
+            {"status": {"$not": {"$regex": ".*srma_retrieved.*"}}}
+        ))
+    
+    def save_individual_status(self, batch_id: str, status_data: Dict[str, Any]) -> None:
+        """Save individual batch status"""
+        self.individual_status.update_one(
+            {"id": batch_id},
+            {"$set": status_data},
+            upsert=True
+        )

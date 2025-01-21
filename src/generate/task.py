@@ -52,7 +52,7 @@ class GenerationTask:
         self.db.store_master_variables(self.ensemble_id, all_vars_json)
 
         # Now actually chunk the variables from the request
-        max_vars_per_chunk = 50
+        max_vars_per_chunk = 100
         variable_chunks = chunk_variables(self.variables, max_vars_per_chunk)
 
         # Load the dataset content

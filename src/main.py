@@ -135,7 +135,7 @@ async def evaluate(ensemble_id: str):
     evaluation_result = handler.evaluate_ensemble_extractions(
         merged_data=final_data["results"],
         dataset_path=dataset_path,
-        id_column="master_index",  # or whichever ID column
+        id_column="ID",  # or whichever ID column
         db=db
     )
 

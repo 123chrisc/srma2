@@ -8,7 +8,6 @@ MAX_COMPLETION_TOKENS = 8192
 
 OPENAI_MODELS = set(
     [
-        "o1-2024-12-17",
         "gpt-4-0125-preview",
         "gpt-4-turbo-2024-04-09",
         "gpt-4o-2024-05-13",
@@ -19,6 +18,7 @@ OPENAI_MODELS = set(
 
 ANTHROPIC_MODELS = set(["claude-3-5-sonnet-20241022"])
 
+OPENAI_models_01 = set(["o1-2024-12-17"])
 
 class BatchInterface(BaseModel):
     id: str
