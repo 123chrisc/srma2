@@ -146,25 +146,32 @@ Please extract these variables and format your response as follows:
 
                 # Validate against known variables
                 if key in self.validators:
-                    try:
-                        validated_val = self.validators[key](value)
-                        combined_extractions[key].append(validated_val)
-                    except Exception:
-                        # If a single line fails (e.g., invalid numeric), skip
-                        continue
+                    # Split on commas for potential multiple numeric or string values
+                    sub_vals = [v.strip() for v in value.split(",") if v.strip()]
+
+                    for sub_val in sub_vals:
+                        try:
+                            validated_val = self.validators[key](sub_val)
+                            combined_extractions[key].append(validated_val)
+                        except Exception:
+                            # If a single sub_val fails parsing, skip that sub_val
+                            continue
 
         # Merge extracted values
         final_extractions = {}
         for var_name, values in combined_extractions.items():
+            # If only one value was extracted, store it directly
             if len(values) == 1:
                 final_extractions[var_name] = values[0]
             else:
-                final_extractions[var_name] = values
+                # Otherwise, store as comma-separated or as a list, whichever you prefer:
+                # final_extractions[var_name] = values
+                final_extractions[var_name] = ", ".join(map(str, values))
 
-        # Handle required fields more gracefully:
+        # Handle required fields more gracefully
         for var_name, var_def in self.all_variables.items():
             if var_def.get("required") and var_name not in final_extractions:
-                # Instead of raising an error, store 'na' or some placeholder
+                # Instead of raising an error, store 'not found'
                 final_extractions[var_name] = "not found"
 
         return final_extractions

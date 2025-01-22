@@ -18,11 +18,13 @@ jiter==0.8.2
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
-numpy==2.0.1
+numpy==1.24.3
 openai==1.58.1
+pandas==1.5.3
 pydantic==2.10.4
 pydantic_core==2.27.2
 Pygments==2.18.0
+pymongo==4.6.2
 python-dotenv==1.0.1
 python-multipart==0.0.20
 PyYAML==6.0.2

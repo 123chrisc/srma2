@@ -68,6 +68,7 @@ class GenerationTask:
             chunk_index += 1
             prompt_run_id = str(uuid.uuid4())[:8]
 
+            # Pass use_master=False so only this chunk's variables are used
             extraction_handler = ExtractionHandler(
                 variable_definitions=chunk_vars,
                 ensemble_id=self.ensemble_id,

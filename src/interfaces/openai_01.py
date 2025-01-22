@@ -8,7 +8,7 @@ from openai import AsyncOpenAI, APIError, RateLimitError
 from pydantic import BaseModel
 
 from src.interfaces.interface import (
-    MAX_COMPLETION_TOKENS,
+    O1_MAX_COMPLETION_TOKENS,
     BatchInterface,
     BatchResponseInterface,
     Interface,
@@ -102,7 +102,7 @@ class O1Interface(Interface):
                 raise ValueError(f"Prompt at index {i} is empty or contains only whitespace")
 
         # Estimate total tokens needed
-        total_tokens = sum(self.estimate_tokens(p) for p in prompts) + len(prompts) * MAX_COMPLETION_TOKENS
+        total_tokens = sum(self.estimate_tokens(p) for p in prompts) + len(prompts) * O1_MAX_COMPLETION_TOKENS
         await self.token_bucket.consume(total_tokens)
         
         batch_id = f"batch_{int(time.time())}_{prompt_run_id}"
@@ -119,7 +119,7 @@ class O1Interface(Interface):
                     "custom_id": prompts_ids[i],
                     "messages": [{"role": "user", "content": prompt}],
                     "model": self.model,
-                    "max_completion_tokens": MAX_COMPLETION_TOKENS,
+                    "max_completion_tokens": O1_MAX_COMPLETION_TOKENS,
                     "seed": seed,
                 }
                 for i, prompt in enumerate(prompts)

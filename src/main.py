@@ -21,33 +21,11 @@ async def data_extraction(request: DataExtractionRequest):
 
     ID levels: ensemble_id > sub_ensemble_id > prompt_run_id
     """
-    # Build an ExtractionHandler solely to generate the final prompt format.
-    #extraction_handler = ExtractionHandler(request.variables)
-    #request.prompt = extraction_handler.generate_extraction_prompt(request.prompt)
-
     generation_task = GenerationTask()
     result_dict = await generation_task.run(request)
-    # e.g. result_dict might be:
-    # {
-    #   "ensemble_id": "abc123",
-    #   "sub_ensemble_id": "def456",
-    #   "created_prompt_runs": [
-    #       {"prompt_run_id": "...", "batch_ids": [...]},
-    #       ...
-    #   ]
-    # }
 
     # Optionally, store dataset_path for each created prompt_run_id if chunked,
-    # or a single prompt_run_id if not chunked
     db = Database()
-
-    # If your run logic returns only one prompt_run_id, do this:
-    # if "prompt_run_id" in result_dict:
-    #     db.cursor.execute(
-    #         "UPDATE batch_info SET dataset_path = ? WHERE prompt_run_id = ?",
-    #         (request.dataset_path, result_dict["prompt_run_id"])
-    #     )
-    #     db.conn.commit()
 
     # If chunk logic returns multiple, handle them:
     created_runs = result_dict.get("created_prompt_runs", [])
@@ -135,7 +113,7 @@ async def evaluate(ensemble_id: str):
     evaluation_result = handler.evaluate_ensemble_extractions(
         merged_data=final_data["results"],
         dataset_path=dataset_path,
-        id_column="ID",  # or whichever ID column
+        id_column="master_index",  # or whichever ID column
         db=db
     )
 
