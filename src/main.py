@@ -64,9 +64,10 @@ async def retrieve(ensemble_id: str):
     return final_data
 
 @app.get("/evaluate/{ensemble_id}")
-async def evaluate(ensemble_id: str):
+async def evaluate(ensemble_id: str, use_ai_evaluation: bool = False):
     """
     Evaluate the accuracy of the extracted variables (compared to CSV).
+    Optional parameter use_ai_evaluation switches between regular and AI-based evaluation.
     """
     retrieval_task = RetrievalTask()
     final_data = await retrieval_task._assemble_results(ensemble_id)
@@ -83,14 +84,7 @@ async def evaluate(ensemble_id: str):
     master_vars = db.retrieve_master_variables(ensemble_id) or []
     all_defs = [VariableDefinition(**mv) for mv in master_vars]
 
-    # Construct your handler
-    handler = ExtractionHandler(
-        variable_definitions=all_defs,
-        ensemble_id=ensemble_id,
-        db=db
-    )
-
-    # Retrieve a single dataset_path from one of the prompt_run_ids
+    # Get dataset path and context information
     prompt_runs = db.find_prompt_runs_for_ensemble(ensemble_id)
     if not prompt_runs:
         return {
@@ -99,9 +93,16 @@ async def evaluate(ensemble_id: str):
             "comparisons": []
         }
 
-    # We assume they share the same dataset_path
+    # Get batch info from the first prompt run
     batch_info = db.retrieve_batch_info(prompt_runs[0])
-    dataset_path = batch_info["dataset_path"] if batch_info else None
+    if not batch_info:
+        return {
+            "status": "no_batch_info",
+            "accuracy_report": {},
+            "comparisons": []
+        }
+
+    dataset_path = batch_info.get("dataset_path")
     if not dataset_path:
         return {
             "status": "no_dataset_path",
@@ -109,19 +110,44 @@ async def evaluate(ensemble_id: str):
             "comparisons": []
         }
 
-    # Evaluate the entire merged data with your new method
-    evaluation_result = handler.evaluate_ensemble_extractions(
-        merged_data=final_data["results"],
-        dataset_path=dataset_path,
-        id_column="master_index",  # or whichever ID column
-        db=db
-    )
+    # Get the ID column from batch info
+    id_column = batch_info.get("id_column", "id")  # Default to "id" if not specified
 
-    # Return the same shape as your old code
+    # Prepare context with safe dictionary access
+    context = {
+        "preprompt": batch_info.get("preprompt", ""),
+        "variable_info": batch_info.get("variable_info", "")
+    }
+
+    if use_ai_evaluation:
+        # Use AI-based evaluation
+        from src.evaluation.ai_evaluator import AIEvaluator
+        evaluator = AIEvaluator(all_defs, ensemble_id)
+        evaluation_result = await evaluator.evaluate_extractions(
+            merged_data=final_data["results"],
+            dataset_path=dataset_path,
+            id_column=id_column,
+            context=context
+        )
+    else:
+        # Use regular evaluation
+        handler = ExtractionHandler(
+            variable_definitions=all_defs,
+            ensemble_id=ensemble_id,
+            db=db
+        )
+        evaluation_result = handler.evaluate_ensemble_extractions(
+            merged_data=final_data["results"],
+            dataset_path=dataset_path,
+            id_column=id_column,
+            db=db
+        )
+
     return {
         "status": "complete",
         "accuracy_report": evaluation_result["metrics"],
-        "comparisons": evaluation_result["comparisons"]
+        "comparisons": evaluation_result["comparisons"],
+        "evaluation_type": "ai" if use_ai_evaluation else "regular"
     }
 
 #@app.get("/batch_status/{ensemble_id}")

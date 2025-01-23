@@ -193,7 +193,21 @@ Please extract these variables and format your response as follows:
         i.e. { doc_id: {"raw_responses": [...], "parsed_extractions": {...} } }.
         """
         df = pd.read_csv(dataset_path)
-        df[id_column] = df[id_column].astype(str)
+
+        # Case-insensitive column matching for ID and variable columns
+        column_map = {col.lower(): col for col in df.columns}
+        actual_id_column = column_map.get(id_column.lower())
+        
+        if not actual_id_column:
+            available_columns = ", ".join(df.columns)
+            return {
+                "status": "error",
+                "message": f"ID column '{id_column}' not found in CSV. Available columns: {available_columns}",
+                "metrics": {},
+                "comparisons": []
+            }
+
+        df[actual_id_column] = df[actual_id_column].astype(str)
 
         metrics = {
             "total_articles": 0,
@@ -207,7 +221,7 @@ Please extract these variables and format your response as follows:
         # Build a quick doc_id -> row map for the CSV
         row_lookup = {}
         for idx, row in df.iterrows():
-            row_id = str(row[id_column])
+            row_id = str(row[actual_id_column])
             row_lookup[row_id] = row
 
         # Go through each doc_id in merged_data
@@ -228,13 +242,17 @@ Please extract these variables and format your response as follows:
                     # Not extracted
                     continue
 
-                # If there's no csv_column or no matching column in the CSV row, skip
+                # Case-insensitive column matching for variable columns
                 csv_col = var_def.get("csv_column")
-                if not csv_col or csv_col not in csv_row:
+                if csv_col:
+                    actual_csv_col = column_map.get(csv_col.lower())
+                    if not actual_csv_col or actual_csv_col not in csv_row:
+                        continue
+                else:
                     continue
 
                 extracted_val = str(parsed_extractions[var_name])
-                ground_val = str(csv_row[csv_col])
+                ground_val = str(csv_row[actual_csv_col])
 
                 # Split on commas if multiple
                 ex_list = [x.strip() for x in extracted_val.split(",") if x.strip()]
@@ -318,6 +336,7 @@ Please extract these variables and format your response as follows:
                 metrics["fully_correct_rows"] += 1
 
         return {
+            "status": "success",
             "metrics": metrics,
             "comparisons": comparisons_list
         }
